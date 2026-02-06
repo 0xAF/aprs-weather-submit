@@ -29,6 +29,27 @@ $ ./aprs-weather-submit -k W1AW-13 -n 41.714692 -e -72.728514 -t 68
 W1AW-13>APRS,TCPIP*:@090247z4142.88N/07243.71W_.../...t068aprs-weather-submit/1.5.2
 ```
 
+## Home Assistant helper (ha.sh)
+
+The script at [ha.sh](ha.sh) can pull weather sensor data from Home Assistant and build an `aprs-weather-submit` command with the converted values. It expects a [.env](.env) file in the repository root (same directory as the script) and uses `curl` and `jq`.
+
+To get started, copy the sample file and fill in your values:
+
+*   Copy [.env.sample](.env.sample) to [.env](.env).
+*   Set `HA_API_TOKEN` (required) and optionally `HA_HOST`.
+*   Configure sensor extraction with `HA_SENSOR_MATCH`, `HA_SENSOR_PREFIX`, and `HA_SENSOR_MAP`.
+*   Provide your APRS settings (`APRS_CALLSIGN`, `APRS_LATITUDE`, `APRS_LONGITUDE`, `APRS_USERNAME`, `APRS_PASSWORD`).
+
+Notes:
+
+*   `APRS_ALTITUDE` is in meters; the script converts it to feet.
+*   `LUX_EFFICACY` controls conversion from lux to W/m² (default 110).
+*   `INTERVAL_SECONDS` controls the loop interval (default 300; set to 0 to run once).
+*   `HA_SENSOR_MATCH` and `HA_SENSOR_PREFIX` control which Home Assistant entities are selected and how their IDs are trimmed.
+*   `HA_SENSOR_MAP` maps script variable names to Home Assistant keys using `var_name:ha_key` pairs.
+	Supported `var_name` values: `battery`, `temperature`, `humidity`, `wind_speed`, `wind_max_speed`, `wind_direction`, `rain_total`, `uv_index`, `outside_luminance`.
+*   The script stores rain history in [.cache](.cache) for rolling calculations.
+
 This app supports all of the parameters defined in APRS versions up to and including version 1.2.1:
 
 *   Altitude (`-A`, `--altitude`)
@@ -75,6 +96,25 @@ Yeah, why not?  Install OpenWatcom and run `MAKE.BAT`.
 
 ## Windows
 This app can be compiled using MinGW.  If other compilers work, please open an issue to let me know!
+
+## Docker
+
+Build and run the Home Assistant helper in a container with a persistent cache file:
+
+1. Copy [.env.sample](.env.sample) to [.env](.env) and fill in required values.
+2. Create an empty cache file so the bind mount is a file:
+
+```bash
+touch .cache
+```
+
+3. Start the service:
+
+```bash
+docker compose up -d --build
+```
+
+The container runs [ha.sh](ha.sh) in a loop; configure the interval with `INTERVAL_SECONDS` in [.env](.env) (default 30; set to 0 to run once). The cache is persisted by bind-mounting [.cache](.cache).
 
 
 ## Legal Notices

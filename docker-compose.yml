@@ -1,0 +1,9 @@
+version: "3.8"
+
+services:
+  aprs-weather-submit:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./.cache:/app/.cache
