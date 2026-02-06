@@ -1,4 +1,5 @@
 {
 	"editor.insertSpaces": false,
-	"makefile.extensionOutputFolder": "./.vscode"
+	"makefile.extensionOutputFolder": "./.vscode",
+	"nuxt.isNuxtApp": false
 }
