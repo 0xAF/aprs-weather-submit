@@ -33,6 +33,8 @@ W1AW-13>APRS,TCPIP*:@090247z4142.88N/07243.71W_.../...t068aprs-weather-submit/1.
 
 The script at [ha.sh](ha.sh) can pull weather sensor data from Home Assistant and build an `aprs-weather-submit` command with the converted values. It expects a [.env](.env) file in the repository root (same directory as the script) and uses `curl` and `jq`.
 
+In this setup, Home Assistant receives weather station data over the air via rtl_433, and [ha.sh](ha.sh) simply reads the resulting Home Assistant sensor states. A common approach is to use the rtl_433 Home Assistant add-on from [pbkhrv/rtl_433-hass-addons](https://github.com/pbkhrv/rtl_433-hass-addons) to ingest the radio data.
+
 To get started, copy the sample file and fill in your values:
 
 *   Copy [.env.sample](.env.sample) to [.env](.env).
