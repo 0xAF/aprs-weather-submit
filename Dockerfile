@@ -30,5 +30,6 @@ RUN apt-get update \
 WORKDIR /app
 COPY --from=build /src/aprs-weather-submit /app/aprs-weather-submit
 COPY --from=build /src/ha.sh /app/ha.sh
-RUN chmod +x /app/ha.sh /app/aprs-weather-submit
+COPY --from=build /src/pws-report.sh /app/pws-report.sh
+RUN chmod +x /app/ha.sh /app/pws-report.sh /app/aprs-weather-submit
 CMD ["./ha.sh"]

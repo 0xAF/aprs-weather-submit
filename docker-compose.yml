@@ -6,4 +6,4 @@ services:
     restart: unless-stopped
     volumes:
       - ./.env:/app/.env:ro
-      - ./.cache:/app/.cache
+      - ./.pws-report.cache:/app/.pws-report.cache

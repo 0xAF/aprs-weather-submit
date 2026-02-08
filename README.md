@@ -29,9 +29,9 @@ $ ./aprs-weather-submit -k W1AW-13 -n 41.714692 -e -72.728514 -t 68
 W1AW-13>APRS,TCPIP*:@090247z4142.88N/07243.71W_.../...t068aprs-weather-submit/1.5.2
 ```
 
-## Home Assistant helper (ha.sh)
+## Home Assistant collector (ha.sh)
 
-The script at [ha.sh](ha.sh) can pull weather sensor data from Home Assistant and build an `aprs-weather-submit` command with the converted values. It expects a [.env](.env) file in the repository root (same directory as the script) and uses `curl` and `jq`.
+The script at [ha.sh](ha.sh) collects weather sensor data from Home Assistant and calls the sender at [pws-report.sh](pws-report.sh) with `key=value` parameters. It expects a [.env](.env) file in the repository root (same directory as the script) and uses `curl` and `jq`.
 
 In this setup, Home Assistant receives weather station data over the air via rtl_433, and [ha.sh](ha.sh) simply reads the resulting Home Assistant sensor states. A common approach is to use the rtl_433 Home Assistant add-on from [pbkhrv/rtl_433-hass-addons](https://github.com/pbkhrv/rtl_433-hass-addons) to ingest the radio data.
 
@@ -39,23 +39,67 @@ To get started, copy the sample file and fill in your values:
 
 *   Copy [.env.sample](.env.sample) to [.env](.env).
 *   Set `HA_API_TOKEN` (required) and optionally `HA_HOST`.
-*   Configure sensor extraction with `HA_SENSOR_MATCH`, `HA_SENSOR_PREFIX`, and `HA_SENSOR_MAP`.
-*   Provide your APRS settings (`APRS_CALLSIGN`, `APRS_LATITUDE`, `APRS_LONGITUDE`, `APRS_USERNAME`, `APRS_PASSWORD`).
+*   Configure sensor extraction with `HA_ENTITY_MATCH`, `HA_ENTITY_PREFIX`, and `HA_ENTITY_MAP`.
+*   Enable destinations and configure credentials with `APRS_ENABLE`, `WINDY_ENABLE`, and the corresponding settings.
 
 Notes:
 
-*   `APRS_ALTITUDE` is in meters; the script converts it to feet.
+*   `HA_ENTITY_MAP` maps sender parameters to Home Assistant keys using `param:ha_key` pairs. The `ha_key` is the matched entity ID after `HA_ENTITY_PREFIX` is removed.
+*   `DEBUG=1` enables debug logs and reports unused HA entities at the collector.
+*   The collector loop cadence uses `REPORT_INTERVAL` (minimum 300 seconds).
+*   The rain cache is maintained by [pws-report.sh](pws-report.sh), not the collector.
+
+Example mapping:
+
+```dotenv
+HA_ENTITY_MAP="temperatureC:temperature humidity:humidity windSpeedKph:wind_speed windGustKph:wind_max_speed windDirDeg:wind_direction rainTotalMm:rain_total uvIndex:uv_index outsideLuminanceLux:outside_luminance"
+```
+
+## Sender (pws-report.sh)
+
+The script at [pws-report.sh](pws-report.sh) reads [.env](.env), converts units, computes rain deltas from its cache, and sends observations to APRS and/or Windy based on `APRS_ENABLE` and `WINDY_ENABLE`. It crafts payloads using only the fields you provide and warns when recommended fields are missing.
+
+Manual example:
+
+```console
+$ ./pws-report.sh temperatureC=12.3 humidity=45 windSpeedKph=10 windDirDeg=180 rainTotalMm=12.7
+```
+
+HA-driven example (from [ha.sh](ha.sh)):
+
+```console
+$ ./pws-report.sh temperatureC=7.2 humidity=97 windSpeedKph=1.9 windGustKph=3.3 windDirDeg=168 rainTotalMm=36.81 uvIndex=0 outsideLuminanceLux=0
+```
+
+Options:
+
+*   `--dry-run` logs the outgoing requests without sending.
+*   `--log-fields` prints only the parameter keys (no values).
+*   `--force-send` bypasses interval checks for this invocation.
+
+Supported input keys (explicit unit suffixes):
+
+*   `temperatureC`, `temperatureF`
+*   `dewpointC`, `dewpointF`
+*   `humidity`
+*   `windSpeedKph`, `windSpeedMps`, `windSpeedMph`
+*   `windGustKph`, `windGustMps`, `windGustMph`
+*   `windDirDeg`
+*   `rainTotalMm`
+*   `pressureHpa`, `pressurePa`
+*   `uvIndex`
+*   `outsideLuminanceLux`
+
+Notes:
+
+*   `APRS_ENABLE` and `WINDY_ENABLE` control destinations (0/1).
+*   `APRS_DRY_RUN` and `WINDY_DRY_RUN` log without sending.
+*   `REPORT_INTERVAL` controls how often APRS/Windy sends are attempted (minimum 300).
+*   `APRS_ALTITUDE_M` is in meters; it is converted to feet for APRS.
 *   `LUX_EFFICACY` controls conversion from lux to W/m² (default 110).
-*   `APRS_INTERVAL` controls APRS uploads (seconds, minimum 300).
-*   `APRS_DRY_RUN` logs APRS output without sending (0/1).
-*   `WINDY_ENABLED` toggles Windy uploads (0/1).
-*   `WINDY_INTERVAL` controls Windy uploads (seconds, minimum 300).
-*   The loop cadence is the GCD of APRS/Windy intervals, with a 30-second minimum.
-*   `HA_SENSOR_MATCH` and `HA_SENSOR_PREFIX` control which Home Assistant entities are selected and how their IDs are trimmed.
-*   `HA_SENSOR_MAP` maps script variable names to Home Assistant keys using `var_name:ha_key` pairs.
-	Supported `var_name` values: `battery`, `temperature`, `humidity`, `wind_speed`, `wind_max_speed`, `wind_direction`, `rain_total`, `uv_index`, `outside_luminance`.
-*   The script stores rain history in [.cache](.cache) for rolling calculations.
-*   Windy uploads use metric units and omit missing fields. Set `WINDY_DRY_RUN=1` to log without sending.
+*   `PWS_CACHE_FILE` stores rain history and last-send timestamps (default .pws-report.cache).
+*   `--dry-run` overrides both destination dry-run flags.
+*   Exit code is 2 when no outputs are generated.
 
 This app supports all of the parameters defined in APRS versions up to and including version 1.2.1:
 
@@ -106,13 +150,13 @@ This app can be compiled using MinGW.  If other compilers work, please open an i
 
 ## Docker
 
-Build and run the Home Assistant helper in a container with a persistent cache file:
+Build and run the Home Assistant collector in a container with a persistent cache file:
 
 1. Copy [.env.sample](.env.sample) to [.env](.env) and fill in required values.
 2. Create an empty cache file so the bind mount is a file:
 
 ```bash
-touch .cache
+touch .pws-report.cache
 ```
 
 3. Start the service:
@@ -121,7 +165,7 @@ touch .cache
 docker compose up -d --build
 ```
 
-The container runs [ha.sh](ha.sh) in a loop; configure intervals with `APRS_INTERVAL` and `WINDY_INTERVAL` in [.env](.env). Windy uploads are limited to a minimum 300-second interval, and the loop cadence is the GCD of the configured intervals with a 30-second minimum. The cache is persisted by bind-mounting [.cache](.cache).
+The container runs [ha.sh](ha.sh) in a loop; configure the interval with `REPORT_INTERVAL` in [.env](.env). Windy uploads are limited to a minimum 300-second interval, and the loop cadence is derived from the configured interval with a 300-second minimum. The cache is persisted by bind-mounting [.pws-report.cache](.pws-report.cache).
 
 
 ## Legal Notices

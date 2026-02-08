@@ -1,5 +1,6 @@
 
 .env
+.pws-report.cache
 .cache
 
 # Created by https://www.gitignore.io/api/c
