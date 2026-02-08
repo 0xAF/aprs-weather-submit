@@ -44,11 +44,16 @@ Notes:
 
 *   `APRS_ALTITUDE` is in meters; the script converts it to feet.
 *   `LUX_EFFICACY` controls conversion from lux to W/m² (default 110).
-*   `INTERVAL_SECONDS` controls the loop interval (default 300; set to 0 to run once).
+*   `APRS_INTERVAL` controls APRS uploads (seconds, minimum 300).
+*   `APRS_DRY_RUN` logs APRS output without sending (0/1).
+*   `WINDY_ENABLED` toggles Windy uploads (0/1).
+*   `WINDY_INTERVAL` controls Windy uploads (seconds, minimum 300).
+*   The loop cadence is the GCD of APRS/Windy intervals, with a 30-second minimum.
 *   `HA_SENSOR_MATCH` and `HA_SENSOR_PREFIX` control which Home Assistant entities are selected and how their IDs are trimmed.
 *   `HA_SENSOR_MAP` maps script variable names to Home Assistant keys using `var_name:ha_key` pairs.
 	Supported `var_name` values: `battery`, `temperature`, `humidity`, `wind_speed`, `wind_max_speed`, `wind_direction`, `rain_total`, `uv_index`, `outside_luminance`.
 *   The script stores rain history in [.cache](.cache) for rolling calculations.
+*   Windy uploads use metric units and omit missing fields. Set `WINDY_DRY_RUN=1` to log without sending.
 
 This app supports all of the parameters defined in APRS versions up to and including version 1.2.1:
 
@@ -114,7 +119,7 @@ touch .cache
 docker compose up -d --build
 ```
 
-The container runs [ha.sh](ha.sh) in a loop; configure the interval with `INTERVAL_SECONDS` in [.env](.env) (default 30; set to 0 to run once). The cache is persisted by bind-mounting [.cache](.cache).
+The container runs [ha.sh](ha.sh) in a loop; configure intervals with `APRS_INTERVAL` and `WINDY_INTERVAL` in [.env](.env). Windy uploads are limited to a minimum 300-second interval, and the loop cadence is the GCD of the configured intervals with a 30-second minimum. The cache is persisted by bind-mounting [.cache](.cache).
 
 
 ## Legal Notices
