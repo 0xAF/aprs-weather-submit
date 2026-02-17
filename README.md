@@ -46,6 +46,7 @@ Notes:
 
 *   `HA_ENTITY_MAP` maps sender parameters to Home Assistant keys using `param:ha_key` pairs. The `ha_key` is the matched entity ID after `HA_ENTITY_PREFIX` is removed.
 *   `DEBUG=1` enables debug logs and reports unused HA entities at the collector.
+*   `DRY_RUN_HA=1` logs the `pws-report.sh` invocation without running it.
 *   The collector loop cadence uses `REPORT_INTERVAL` (minimum 300 seconds).
 *   The rain cache is maintained by [pws-report.sh](pws-report.sh), not the collector.
 
@@ -94,6 +95,7 @@ Notes:
 
 *   `APRS_ENABLE` and `WINDY_ENABLE` control destinations (0/1).
 *   `APRS_DRY_RUN` and `WINDY_DRY_RUN` log without sending.
+*   `DRY_RUN_PWS=1` logs the `aprs-weather-submit` and `curl` commands without running them.
 *   `REPORT_INTERVAL` controls how often APRS/Windy sends are attempted (minimum 300).
 *   `APRS_ALTITUDE_M` is in meters; it is converted to feet for APRS.
 *   `LUX_EFFICACY` controls conversion from lux to W/m² (default 110).

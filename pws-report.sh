@@ -13,6 +13,7 @@ set -a
 set +a
 
 DEBUG="${DEBUG:-0}"
+DRY_RUN_PWS="${DRY_RUN_PWS:-0}"
 APRS_ENABLE="${APRS_ENABLE:-0}"
 WINDY_ENABLE="${WINDY_ENABLE:-0}"
 REPORT_INTERVAL="${REPORT_INTERVAL:-300}"
@@ -153,6 +154,7 @@ if [ "$LOG_FIELDS" -eq 1 ]; then
 fi
 
 validate_bool "DEBUG" "$DEBUG"
+validate_bool "DRY_RUN_PWS" "$DRY_RUN_PWS"
 validate_bool "APRS_ENABLE" "$APRS_ENABLE"
 validate_bool "WINDY_ENABLE" "$WINDY_ENABLE"
 validate_bool "APRS_DRY_RUN" "$APRS_DRY_RUN"
@@ -297,10 +299,14 @@ last_day_mm=""
 if [ -n "$rain_total_mm" ]; then
   today=$(date +%F)
 
-  if [ -n "$RAIN_TOTAL_MM_LAST" ] && [ -n "$rain_total_mm" ] && awk "BEGIN{exit !($rain_total_mm < $RAIN_TOTAL_MM_LAST)}"; then
+  if [ -n "$RAIN_TOTAL_MM_LAST" ] && is_number "$RAIN_TOTAL_MM_LAST" \
+    && [ -n "$rain_total_mm" ] \
+    && awk "BEGIN{exit !($rain_total_mm < $RAIN_TOTAL_MM_LAST)}"; then
+    warn "rainTotalMm decreased from ${RAIN_TOTAL_MM_LAST} to ${rain_total_mm}; treating as sensor reset."
     RAIN_HISTORY=""
     MIDNIGHT_DATE="$today"
     MIDNIGHT_TOTAL="$rain_total_mm"
+    RAIN_TOTAL_MM_LAST="$rain_total_mm"
   fi
 
   if [ -z "$MIDNIGHT_DATE" ] || [ "$MIDNIGHT_DATE" != "$today" ] || [ -z "$MIDNIGHT_TOTAL" ]; then
@@ -515,7 +521,12 @@ if [ "$aprs_due" -eq 1 ]; then
   if [ "$DEBUG" -eq 1 ]; then
     printf '[%s]: sending data to aprs: %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "${aprs_log[*]}"
   fi
-  if [ "$APRS_DRY_RUN" -eq 1 ]; then
+  if [ "$DRY_RUN_PWS" -eq 1 ]; then
+    printf 'DRY_RUN_PWS: would run:'
+    printf ' %q' "${aprs_log[@]}"
+    printf '\n'
+    any_output=1
+  elif [ "$APRS_DRY_RUN" -eq 1 ]; then
     printf '[%s]: aprs dry-run: %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "${aprs_log[*]}"
     any_output=1
   else
@@ -566,14 +577,38 @@ if [ "$windy_due" -eq 1 ]; then
   add_query "uv" "$uv_index"
   add_query "solarradiation" "$luminosity_wm2"
 
+  curl_cmd=(
+    curl -sS -G "$WINDY_URL"
+    "${query_args[@]}"
+    -H "Accept: application/json"
+    -w "\n%{http_code}"
+  )
+
+  query_log_args=()
+  for entry in "${query_log[@]}"; do
+    query_log_args+=("--data-urlencode" "$entry")
+  done
+
+  curl_log=(
+    curl -sS -G "$WINDY_URL"
+    "${query_log_args[@]}"
+    -H "Accept: application/json"
+    -w "\n%{http_code}"
+  )
+
   if [ "$DEBUG" -eq 1 ]; then
     printf '[%s]: sending data to windy: %s params: %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$WINDY_URL" "${query_log[*]}"
   fi
-  if [ "$WINDY_DRY_RUN" -eq 1 ]; then
+  if [ "$DRY_RUN_PWS" -eq 1 ]; then
+    printf 'DRY_RUN_PWS: would run:'
+    printf ' %q' "${curl_log[@]}"
+    printf '\n'
+    any_output=1
+  elif [ "$WINDY_DRY_RUN" -eq 1 ]; then
     printf '[%s]: windy dry-run: %s params: %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$WINDY_URL" "${query_log[*]}"
     any_output=1
   else
-    if ! response=$(curl -sS -G "$WINDY_URL" "${query_args[@]}" -H "Accept: application/json" -w "\n%{http_code}"); then
+    if ! response=$("${curl_cmd[@]}"); then
       warn "Windy upload failed (curl error)."
     else
       http_code=$(echo "$response" | tail -n 1)

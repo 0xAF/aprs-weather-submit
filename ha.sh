@@ -13,6 +13,7 @@ set -a
 set +a
 
 DEBUG="${DEBUG:-0}"
+DRY_RUN_HA="${DRY_RUN_HA:-0}"
 WINDY_ENABLE="${WINDY_ENABLE:-0}"
 APRS_ENABLE="${APRS_ENABLE:-0}"
 REPORT_INTERVAL="${REPORT_INTERVAL:-300}"
@@ -53,6 +54,7 @@ validate_positive_int() {
 }
 
 validate_bool "DEBUG" "$DEBUG"
+validate_bool "DRY_RUN_HA" "$DRY_RUN_HA"
 validate_bool "WINDY_ENABLE" "$WINDY_ENABLE"
 validate_bool "APRS_ENABLE" "$APRS_ENABLE"
 validate_positive_int "REPORT_INTERVAL" "$REPORT_INTERVAL"
@@ -130,6 +132,13 @@ collect_once() {
 
   if [ "${#report_args[@]}" -eq 0 ]; then
     warn "No mapped HA values found to report."
+  fi
+
+  if [ "$DRY_RUN_HA" -eq 1 ]; then
+    printf 'DRY_RUN_HA: would run:'
+    printf ' %q' ./pws-report.sh "${extra_args[@]}" "${report_args[@]}"
+    printf '\n'
+    return 0
   fi
 
   ./pws-report.sh "${extra_args[@]}" "${report_args[@]}"
